@@ -113,6 +113,11 @@ public struct Executor {
         // 8. Collect cell map
         let cells = try collectCells(workspaceId: wsId, model: model)
 
+        // 9. Rename surfaces if names are specified
+        if model.names != nil {
+            try renameSurfaces(cells: cells, workspaceId: wsId)
+        }
+
         return LayoutResult(workspaceRef: wsRef, workspaceId: wsId, cells: cells)
     }
 
@@ -214,6 +219,18 @@ public struct Executor {
             }
         }
         return cells
+    }
+
+    private func renameSurfaces(cells: [CellInfo], workspaceId: String) throws {
+        for cell in cells {
+            guard let name = cell.name else { continue }
+            _ = try client.call(method: "tab.action", params: [
+                "action": "rename",
+                "surface_id": cell.surfaceRef,
+                "workspace_id": workspaceId,
+                "title": name,
+            ])
+        }
     }
 }
 
