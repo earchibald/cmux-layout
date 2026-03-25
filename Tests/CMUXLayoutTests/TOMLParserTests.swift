@@ -117,4 +117,88 @@ struct TOMLParserTests {
         let doc = try TOMLParser.parse(input)
         #expect(TOMLParser.serialize(doc) == input)
     }
+
+    // MARK: - Query and mutation API
+
+    @Test func getStringReturnsValue() throws {
+        let input = """
+        [templates.dev]
+        descriptor = "grid:2x2"
+        """
+        let doc = try TOMLParser.parse(input)
+        #expect(doc.getString(table: "templates.dev", key: "descriptor") == "grid:2x2")
+    }
+
+    @Test func getStringReturnsNilForMissingKey() throws {
+        let input = "[templates.dev]"
+        let doc = try TOMLParser.parse(input)
+        #expect(doc.getString(table: "templates.dev", key: "nope") == nil)
+    }
+
+    @Test func getStringReturnsNilForMissingTable() throws {
+        let input = "[settings]"
+        let doc = try TOMLParser.parse(input)
+        #expect(doc.getString(table: "nope", key: "key") == nil)
+    }
+
+    @Test func setStringUpdatesExistingKey() throws {
+        let input = """
+        [templates.dev]
+        descriptor = "grid:2x2"
+        """
+        var doc = try TOMLParser.parse(input)
+        doc.setString(table: "templates.dev", key: "descriptor", value: "grid:3x3")
+        #expect(doc.getString(table: "templates.dev", key: "descriptor") == "grid:3x3")
+    }
+
+    @Test func setStringAddsNewKeyToExistingTable() throws {
+        let input = "[templates.dev]"
+        var doc = try TOMLParser.parse(input)
+        doc.setString(table: "templates.dev", key: "descriptor", value: "grid:2x2")
+        #expect(doc.getString(table: "templates.dev", key: "descriptor") == "grid:2x2")
+    }
+
+    @Test func removeTableDeletesTableAndKeys() throws {
+        let input = """
+        [templates.dev]
+        descriptor = "grid:2x2"
+
+        [templates.ops]
+        descriptor = "grid:3x3"
+        """
+        var doc = try TOMLParser.parse(input)
+        doc.removeTable("templates.dev")
+        #expect(doc.getString(table: "templates.dev", key: "descriptor") == nil)
+        #expect(doc.getString(table: "templates.ops", key: "descriptor") == "grid:3x3")
+    }
+
+    @Test func insertTableAddsAfterTarget() throws {
+        let input = """
+        [settings]
+        # empty
+
+        [templates]
+        # examples here
+        """
+        var doc = try TOMLParser.parse(input)
+        doc.insertTable("templates.dev", after: "templates")
+        doc.setString(table: "templates.dev", key: "descriptor", value: "grid:2x2")
+        let output = TOMLParser.serialize(doc)
+        #expect(output.contains("[templates.dev]"))
+        #expect(output.contains("descriptor = \"grid:2x2\""))
+    }
+
+    @Test func listTablesWithPrefix() throws {
+        let input = """
+        [settings]
+        [templates]
+        [templates.dev]
+        descriptor = "grid:2x2"
+        [templates.ops]
+        descriptor = "grid:3x3"
+        """
+        let doc = try TOMLParser.parse(input)
+        let names = doc.tablesWithPrefix("templates.")
+        #expect(names == ["templates.dev", "templates.ops"])
+    }
 }
