@@ -119,4 +119,72 @@ struct ExecutorTests {
         let tabCalls = client.calls(to: "tab.action")
         #expect(tabCalls.isEmpty)
     }
+
+    // MARK: - Browser surface swap
+
+    @Test func browserCellTriggersSurfaceCreateAndClose() throws {
+        let client = makeClient()
+        client.stub(method: "surface.create", result: [
+            "surface_id": "BROWSER-SURF-UUID",
+            "surface_ref": "surface:99",
+        ])
+        client.stub(method: "surface.close", result: [:])
+
+        let model = try Parser().parse("grid:1x1 | names:docs=b:https://x.com")
+        let executor = Executor(client: client)
+        let _ = try executor.apply(model)
+
+        let createCalls = client.calls(to: "surface.create")
+        #expect(createCalls.count == 1)
+        #expect(createCalls[0].params["type"] as? String == "browser")
+        #expect(createCalls[0].params["url"] as? String == "https://x.com")
+
+        let closeCalls = client.calls(to: "surface.close")
+        #expect(closeCalls.count == 1)
+    }
+
+    @Test func terminalCellDoesNotTriggerSwap() throws {
+        let client = makeClient()
+        let model = try Parser().parse("grid:1x1 | names:nav")
+        let executor = Executor(client: client)
+        let _ = try executor.apply(model)
+
+        #expect(client.calls(to: "surface.create").isEmpty)
+        #expect(client.calls(to: "surface.close").isEmpty)
+    }
+
+    @Test func blankBrowserOmitsUrl() throws {
+        let client = makeClient()
+        client.stub(method: "surface.create", result: [
+            "surface_id": "BROWSER-SURF-UUID",
+            "surface_ref": "surface:99",
+        ])
+        client.stub(method: "surface.close", result: [:])
+
+        let model = try Parser().parse("grid:1x1 | names:b:")
+        let executor = Executor(client: client)
+        let _ = try executor.apply(model)
+
+        let createCalls = client.calls(to: "surface.create")
+        #expect(createCalls.count == 1)
+        #expect(createCalls[0].params["url"] == nil)
+    }
+
+    @Test func renameHappensAfterBrowserSwap() throws {
+        let client = makeClient()
+        client.stub(method: "surface.create", result: [
+            "surface_id": "BROWSER-SURF-UUID",
+            "surface_ref": "surface:99",
+        ])
+        client.stub(method: "surface.close", result: [:])
+
+        let model = try Parser().parse("grid:1x1 | names:docs=b:https://x.com")
+        let executor = Executor(client: client)
+        let _ = try executor.apply(model)
+
+        let renameCalls = client.calls(to: "tab.action")
+        #expect(renameCalls.count == 1)
+        #expect(renameCalls[0].params["surface_id"] as? String == "surface:99")
+        #expect(renameCalls[0].params["title"] as? String == "docs")
+    }
 }
