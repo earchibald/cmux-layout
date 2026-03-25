@@ -146,4 +146,18 @@ struct IntegrationTests {
 
         _ = try client.call(method: "workspace.close", params: ["workspace_id": result.workspaceId])
     }
+
+    @Test func terminalCommandInjected() throws {
+        let model = try Parser().parse("workspace:Cmd Test | cols:100 | names:shell")
+        var mutableModel = model
+        mutableModel.cells = [CellSpec(name: "shell", type: .terminal(command: "echo CMUX_CMD_TEST_MARKER"))]
+
+        let executor = Executor(client: client)
+        let result = try executor.apply(mutableModel)
+
+        #expect(result.cells.count == 1)
+        #expect(result.cells[0].name == "shell")
+
+        _ = try client.call(method: "workspace.close", params: ["workspace_id": result.workspaceId])
+    }
 }
