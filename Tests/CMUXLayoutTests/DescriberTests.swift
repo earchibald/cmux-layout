@@ -167,6 +167,23 @@ struct DescriberTests {
         }
     }
 
+    @Test func describeEqualGridProducesShorthand() throws {
+        let client = makeClient()
+        stubPanes(client, panes: [
+            ["id": "P1", "ref": "pane:1", "x": 0.0, "y": 0.0, "width": 500.0, "height": 500.0],
+            ["id": "P2", "ref": "pane:2", "x": 0.0, "y": 500.0, "width": 500.0, "height": 500.0],
+            ["id": "P3", "ref": "pane:3", "x": 500.0, "y": 0.0, "width": 500.0, "height": 500.0],
+            ["id": "P4", "ref": "pane:4", "x": 500.0, "y": 500.0, "width": 500.0, "height": 500.0],
+        ])
+        enqueueSurfaces(client, surfaces: [["id": "S1", "ref": "surface:1", "type": "terminal", "title": ""]])
+        enqueueSurfaces(client, surfaces: [["id": "S2", "ref": "surface:2", "type": "terminal", "title": ""]])
+        enqueueSurfaces(client, surfaces: [["id": "S3", "ref": "surface:3", "type": "terminal", "title": ""]])
+        enqueueSurfaces(client, surfaces: [["id": "S4", "ref": "surface:4", "type": "terminal", "title": ""]])
+
+        let descriptor = Serializer().serialize(try Describer(client: client).describe(workspace: "workspace:1"))
+        #expect(descriptor == "grid:2x2")
+    }
+
     @Test func describeOutputParsesBack() throws {
         let client = makeClient()
         stubPanes(client, panes: [
