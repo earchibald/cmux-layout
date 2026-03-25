@@ -83,4 +83,38 @@ struct TOMLParserTests {
             Issue.record("Expected keyValue entry")
         }
     }
+
+    // MARK: - Serialization
+
+    @Test func serializeEmptyDocument() {
+        let doc = TOMLDocument(entries: [])
+        #expect(TOMLParser.serialize(doc) == "")
+    }
+
+    @Test func roundTripPreservesStructure() throws {
+        let input = """
+        # cmux-layout configuration
+        # Version: 1
+
+        [settings]
+        # No settings yet.
+
+        [templates.dev]
+        descriptor = "workspace:Dev | cols:25,50,25"
+        """
+        let doc = try TOMLParser.parse(input)
+        let output = TOMLParser.serialize(doc)
+        #expect(output == input)
+    }
+
+    @Test func roundTripPreservesCommentedOutExample() throws {
+        let input = """
+        [templates]
+        # Example:
+        # [templates.dev]
+        # descriptor = "grid:2x2"
+        """
+        let doc = try TOMLParser.parse(input)
+        #expect(TOMLParser.serialize(doc) == input)
+    }
 }

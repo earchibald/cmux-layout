@@ -84,6 +84,31 @@ public struct TOMLParser: Sendable {
         return TOMLDocument(entries: entries)
     }
 
+    public static func serialize(_ doc: TOMLDocument) -> String {
+        guard !doc.entries.isEmpty else { return "" }
+        var lines: [String] = []
+        for entry in doc.entries {
+            switch entry {
+            case .blank:
+                lines.append("")
+            case .comment(let text):
+                lines.append(text)
+            case .table(let name):
+                lines.append("[\(name)]")
+            case .keyValue(let key, let value):
+                lines.append("\(key) = \"\(escapeString(value))\"")
+            }
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private static func escapeString(_ s: String) -> String {
+        s.replacingOccurrences(of: "\\", with: "\\\\")
+         .replacingOccurrences(of: "\"", with: "\\\"")
+         .replacingOccurrences(of: "\n", with: "\\n")
+         .replacingOccurrences(of: "\t", with: "\\t")
+    }
+
     private static func isValidBareKey(_ key: String) -> Bool {
         !key.isEmpty && key.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
     }
