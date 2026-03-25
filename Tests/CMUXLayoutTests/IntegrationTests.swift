@@ -97,4 +97,53 @@ struct IntegrationTests {
         let dir = (path as NSString).deletingLastPathComponent
         try? FileManager.default.removeItem(atPath: dir)
     }
+
+    @Test func browserSurfaceCreated() throws {
+        let model = try Parser().parse("workspace:Browser Test | cols:100 | names:docs=b:https://example.com")
+        let executor = Executor(client: client)
+        let result = try executor.apply(model)
+
+        #expect(result.cells.count == 1)
+
+        let paneListResp = try client.call(method: "pane.list", params: ["workspace_id": result.workspaceId])
+        let panes = paneListResp.result?["panes"] as? [[String: Any]] ?? []
+        let paneId = panes.first?["id"] as? String ?? ""
+        let surfResp = try client.call(method: "pane.surfaces", params: [
+            "workspace_id": result.workspaceId, "pane_id": paneId,
+        ])
+        let surfaces = surfResp.result?["surfaces"] as? [[String: Any]] ?? []
+        #expect(surfaces.count == 1)
+        #expect(surfaces[0]["type"] as? String == "browser")
+
+        _ = try client.call(method: "workspace.close", params: ["workspace_id": result.workspaceId])
+    }
+
+    @Test func mixedTerminalAndBrowserSurfaces() throws {
+        let model = try Parser().parse("workspace:Mixed Test | cols:50,50 | names:term,docs=b:https://example.com")
+        let executor = Executor(client: client)
+        let result = try executor.apply(model)
+
+        #expect(result.cells.count == 2)
+
+        let paneListResp = try client.call(method: "pane.list", params: ["workspace_id": result.workspaceId])
+        let panes = paneListResp.result?["panes"] as? [[String: Any]] ?? []
+        var surfaceTypes: [String: String] = [:]
+        for pane in panes {
+            guard let paneId = pane["id"] as? String else { continue }
+            let surfResp = try client.call(method: "pane.surfaces", params: [
+                "workspace_id": result.workspaceId, "pane_id": paneId,
+            ])
+            let surfaces = surfResp.result?["surfaces"] as? [[String: Any]] ?? []
+            for surf in surfaces {
+                if let ref = surf["ref"] as? String, let type = surf["type"] as? String {
+                    surfaceTypes[ref] = type
+                }
+            }
+        }
+
+        #expect(surfaceTypes[result.cells[0].surfaceRef] == "terminal")
+        #expect(surfaceTypes[result.cells[1].surfaceRef] == "browser")
+
+        _ = try client.call(method: "workspace.close", params: ["workspace_id": result.workspaceId])
+    }
 }
