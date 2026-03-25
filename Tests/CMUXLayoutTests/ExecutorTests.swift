@@ -11,14 +11,25 @@ final class RecordingSocketClient: CMUXSocketClient {
 
     private(set) var calls: [Call] = []
     private var responses: [String: CMUXResponse] = [:]
+    private var responseQueues: [String: [CMUXResponse]] = [:]
 
     /// Register a canned response for a method name.
     func stub(method: String, result: [String: Any]) {
         responses[method] = CMUXResponse(data: ["ok": true, "result": result])
     }
 
+    /// Enqueue a response that will be returned before the stub (FIFO).
+    func enqueue(method: String, result: [String: Any]) {
+        responseQueues[method, default: []].append(CMUXResponse(data: ["ok": true, "result": result]))
+    }
+
     func call(method: String, params: [String: Any]) throws -> CMUXResponse {
         calls.append(Call(method: method, params: params))
+        if var queue = responseQueues[method], !queue.isEmpty {
+            let resp = queue.removeFirst()
+            responseQueues[method] = queue
+            return resp
+        }
         if let resp = responses[method] { return resp }
         return CMUXResponse(data: ["ok": true, "result": [:]])
     }
@@ -263,5 +274,24 @@ struct ExecutorTests {
 
         #expect(sentCommands.count == 1)
         #expect(sentCommands[0].command == "cd /tmp && nvim")
+    }
+
+    @Test func recordingClientReturnsQueuedResponses() throws {
+        let client = RecordingSocketClient()
+        client.stub(method: "pane.surfaces", result: ["surfaces": [["id": "S1", "ref": "surface:1"]] as [[String: Any]]])
+        client.enqueue(method: "pane.surfaces", result: ["surfaces": [["id": "S2", "ref": "surface:2"]] as [[String: Any]]])
+        client.enqueue(method: "pane.surfaces", result: ["surfaces": [["id": "S3", "ref": "surface:3"]] as [[String: Any]]])
+
+        let resp1 = try client.call(method: "pane.surfaces", params: ["pane_id": "P1"])
+        let resp2 = try client.call(method: "pane.surfaces", params: ["pane_id": "P2"])
+        let resp3 = try client.call(method: "pane.surfaces", params: ["pane_id": "P3"])
+
+        let surfs1 = resp1.result?["surfaces"] as? [[String: Any]]
+        let surfs2 = resp2.result?["surfaces"] as? [[String: Any]]
+        let surfs3 = resp3.result?["surfaces"] as? [[String: Any]]
+
+        #expect(surfs1?[0]["id"] as? String == "S2")  // queue takes priority
+        #expect(surfs2?[0]["id"] as? String == "S3")
+        #expect(surfs3?[0]["id"] as? String == "S1")  // falls back to stub
     }
 }
