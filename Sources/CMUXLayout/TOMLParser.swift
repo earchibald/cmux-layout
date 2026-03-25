@@ -76,6 +76,11 @@ public struct TOMLParser: Sendable {
             entries.append(.keyValue(key, value))
         }
 
+        // Remove spurious trailing blank produced by split when input ends with newline
+        if input.hasSuffix("\n"), let last = entries.last, case .blank = last {
+            entries.removeLast()
+        }
+
         return TOMLDocument(entries: entries)
     }
 
