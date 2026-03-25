@@ -19,7 +19,7 @@ public struct Describer {
             try getSurfaceInfo(paneId: pane.id)
         }
 
-        let (columns, rows, paneOrder) = reconstructGeometry(panes: panes)
+        let (columns, rows, paneOrder) = reconstructGeometry(panes: panes, workspaceId: workspaceId)
         let orderedSurfaces = paneOrder.map { surfaceInfos[$0] }
         let cells = buildCells(from: orderedSurfaces)
 
@@ -91,16 +91,54 @@ public struct Describer {
         )
     }
 
-    private func reconstructGeometry(panes: [PaneInfo]) -> (columns: [Double], rows: [Int: [Double]], paneOrder: [Int]) {
+    private func reconstructGeometry(panes: [PaneInfo], workspaceId: String) -> (columns: [Double], rows: [Int: [Double]], paneOrder: [Int]) {
         // Try geometry-based reconstruction if fields are present
         if let first = panes.first, first.x != nil && first.width != nil {
             return tryGeometryReconstruction(panes: panes)
+        }
+        // Try resize probing to determine divider positions
+        if let columns = tryResizeProbing(panes: panes, workspaceId: workspaceId) {
+            return (columns, [:], Array(0..<panes.count))
         }
         // Fallback: equal widths, single row per column
         let count = panes.count
         let width = count > 0 ? 100.0 / Double(count) : 100.0
         let columns = normalizePercentages(Array(repeating: width, count: max(count, 1)))
         return (columns, [:], Array(0..<count))
+    }
+
+    private func tryResizeProbing(panes: [PaneInfo], workspaceId: String) -> [Double]? {
+        guard panes.count > 1 else { return nil }
+        var dividerPositions: [Double] = [0.0]
+
+        for i in 1..<panes.count {
+            // Probe: resize left by 1, read old_divider_position, then reverse
+            guard let probeResp = try? client.call(method: "pane.resize", params: [
+                "pane_id": panes[i].id,
+                "workspace_id": workspaceId,
+                "direction": "left",
+                "amount": 1,
+            ]),
+            let pos = probeResp.result?["old_divider_position"] as? Double else {
+                return nil
+            }
+            // Reverse
+            _ = try? client.call(method: "pane.resize", params: [
+                "pane_id": panes[i].id,
+                "workspace_id": workspaceId,
+                "direction": "right",
+                "amount": 1,
+            ])
+            dividerPositions.append(pos)
+        }
+        dividerPositions.append(1.0)
+
+        // Convert to percentages
+        var columns: [Double] = []
+        for i in 0..<(dividerPositions.count - 1) {
+            columns.append((dividerPositions[i + 1] - dividerPositions[i]) * 100.0)
+        }
+        return columns
     }
 
     private func tryGeometryReconstruction(panes: [PaneInfo]) -> (columns: [Double], rows: [Int: [Double]], paneOrder: [Int]) {

@@ -140,6 +140,33 @@ struct DescriberTests {
         }
     }
 
+    @Test func describeFlatLayoutWithoutGeometry() throws {
+        let client = makeClient()
+        // Panes without geometry fields
+        stubPanes(client, panes: [
+            ["id": "P1", "ref": "pane:1"],
+            ["id": "P2", "ref": "pane:2"],
+            ["id": "P3", "ref": "pane:3"],
+        ])
+        // Resize probe responses: 3 panes = 2 dividers
+        // Divider 1 at 0.333, divider 2 at 0.667
+        client.enqueue(method: "pane.resize", result: ["old_divider_position": 0.333, "new_divider_position": 0.334])
+        client.enqueue(method: "pane.resize", result: ["old_divider_position": 0.334, "new_divider_position": 0.333])
+        client.enqueue(method: "pane.resize", result: ["old_divider_position": 0.667, "new_divider_position": 0.668])
+        client.enqueue(method: "pane.resize", result: ["old_divider_position": 0.668, "new_divider_position": 0.667])
+
+        enqueueSurfaces(client, surfaces: [["id": "S1", "ref": "surface:1", "type": "terminal", "title": ""]])
+        enqueueSurfaces(client, surfaces: [["id": "S2", "ref": "surface:2", "type": "terminal", "title": ""]])
+        enqueueSurfaces(client, surfaces: [["id": "S3", "ref": "surface:3", "type": "terminal", "title": ""]])
+
+        let model = try Describer(client: client).describe(workspace: "workspace:1")
+        #expect(model.columns.count == 3)
+        // All should be close to 33.3
+        for col in model.columns {
+            #expect(abs(col - 33.3) < 1.0)
+        }
+    }
+
     @Test func describeOutputParsesBack() throws {
         let client = makeClient()
         stubPanes(client, panes: [
