@@ -10,8 +10,8 @@ public struct Serializer: Sendable {
                 parts.append("workspace:\(name)")
             }
             parts.append(gridStr)
-            if let names = model.names {
-                parts.append("names:\(names.joined(separator: ","))")
+            if let cells = model.cells {
+                parts.append("names:\(cells.map { serializeCellSpec($0) }.joined(separator: ","))")
             }
             return parts.joined(separator: " | ")
         }
@@ -37,11 +37,24 @@ public struct Serializer: Sendable {
             }
         }
 
-        if let names = model.names {
-            parts.append("names:\(names.joined(separator: ","))")
+        if let cells = model.cells {
+            parts.append("names:\(cells.map { serializeCellSpec($0) }.joined(separator: ","))")
         }
 
         return parts.joined(separator: " | ")
+    }
+
+    private func serializeCellSpec(_ cell: CellSpec) -> String {
+        switch cell.type {
+        case .terminal:
+            return cell.name ?? ""
+        case .browser(let url):
+            let urlPart = url ?? ""
+            if let name = cell.name {
+                return "\(name)=b:\(urlPart)"
+            }
+            return "b:\(urlPart)"
+        }
     }
 
     private func tryGridShorthand(_ model: LayoutModel) -> String? {

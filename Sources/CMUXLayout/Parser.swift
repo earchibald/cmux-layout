@@ -15,7 +15,7 @@ public struct Parser: Sendable {
         var columns: [Double]?
         var globalRows: [Double]?
         var indexedRows: [Int: [Double]] = [:]
-        var names: [String]?
+        var cells: [CellSpec]?
 
         for segment in segments {
             if segment.hasPrefix("workspace:") {
@@ -52,9 +52,10 @@ public struct Parser: Sendable {
             } else if segment.hasPrefix("rows:") {
                 globalRows = try parsePercentages(String(segment.dropFirst("rows:".count)))
             } else if segment.hasPrefix("names:") {
-                names = String(segment.dropFirst("names:".count))
+                let tokens = String(segment.dropFirst("names:".count))
                     .split(separator: ",")
                     .map { $0.trimmingCharacters(in: .whitespaces) }
+                cells = tokens.map { parseCellSpec($0) }
             } else {
                 throw ParseError.invalidSegment(segment)
             }
@@ -82,17 +83,36 @@ public struct Parser: Sendable {
             workspaceName: workspaceName,
             columns: normalize(cols),
             rows: indexedRows.mapValues { normalize($0) },
-            names: names
+            cells: cells
         )
 
-        if let n = names {
+        if let c = cells {
             let expected = model.cellCount
-            guard n.count == expected else {
-                throw ParseError.nameCountMismatch(expected: expected, got: n.count)
+            guard c.count == expected else {
+                throw ParseError.nameCountMismatch(expected: expected, got: c.count)
             }
         }
 
         return model
+    }
+
+    private func parseCellSpec(_ token: String) -> CellSpec {
+        if let eqIndex = token.firstIndex(of: "=") {
+            let name = String(token[token.startIndex..<eqIndex])
+            let remainder = String(token[token.index(after: eqIndex)...])
+            if remainder.hasPrefix("b:") {
+                let urlStr = String(remainder.dropFirst(2))
+                return CellSpec(name: name, type: .browser(url: urlStr.isEmpty ? nil : urlStr))
+            } else if remainder.hasPrefix("t:") {
+                return CellSpec(name: name, type: .terminal)
+            }
+            return CellSpec(name: token, type: .terminal)
+        }
+        if token.hasPrefix("b:") {
+            let urlStr = String(token.dropFirst(2))
+            return CellSpec(name: nil, type: .browser(url: urlStr.isEmpty ? nil : urlStr))
+        }
+        return CellSpec(name: token, type: .terminal)
     }
 
     private func parsePercentages(_ str: String) throws -> [Double] {

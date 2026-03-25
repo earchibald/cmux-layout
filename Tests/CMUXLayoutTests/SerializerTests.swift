@@ -25,7 +25,9 @@ struct SerializerTests {
     }
 
     @Test func serializeNames() {
-        let model = LayoutModel(columns: [50, 50], names: ["a", "b"])
+        let model = LayoutModel(columns: [50, 50], cells: [
+            CellSpec(name: "a"), CellSpec(name: "b")
+        ])
         let result = serializer.serialize(model)
         #expect(result == "cols:50,50 | names:a,b")
     }
@@ -58,5 +60,70 @@ struct SerializerTests {
         let model = try parser.parse(original)
         let serialized = serializer.serialize(model)
         #expect(serialized == "grid:4x3")
+    }
+
+    // MARK: - CellSpec serialization
+
+    @Test func serializeTerminalCellSpec() {
+        let model = LayoutModel(columns: [50, 50], cells: [
+            CellSpec(name: "nav"), CellSpec(name: "main")
+        ])
+        let result = serializer.serialize(model)
+        #expect(result == "cols:50,50 | names:nav,main")
+    }
+
+    @Test func serializeNamedBrowser() {
+        let model = LayoutModel(columns: [100], cells: [
+            CellSpec(name: "docs", type: .browser(url: "https://x.com"))
+        ])
+        let result = serializer.serialize(model)
+        #expect(result == "cols:100 | names:docs=b:https://x.com")
+    }
+
+    @Test func serializeUnnamedBrowser() {
+        let model = LayoutModel(columns: [100], cells: [
+            CellSpec(name: nil, type: .browser(url: "https://x.com"))
+        ])
+        let result = serializer.serialize(model)
+        #expect(result == "cols:100 | names:b:https://x.com")
+    }
+
+    @Test func serializeBlankBrowser() {
+        let model = LayoutModel(columns: [100], cells: [
+            CellSpec(name: nil, type: .browser(url: nil))
+        ])
+        let result = serializer.serialize(model)
+        #expect(result == "cols:100 | names:b:")
+    }
+
+    @Test func serializeNamedBlankBrowser() {
+        let model = LayoutModel(columns: [100], cells: [
+            CellSpec(name: "docs", type: .browser(url: nil))
+        ])
+        let result = serializer.serialize(model)
+        #expect(result == "cols:100 | names:docs=b:")
+    }
+
+    @Test func serializeMixedCells() {
+        let model = LayoutModel(columns: [33, 34, 33], cells: [
+            CellSpec(name: "nav"),
+            CellSpec(name: "docs", type: .browser(url: "https://x.com")),
+            CellSpec(name: "logs"),
+        ])
+        let result = serializer.serialize(model)
+        #expect(result == "cols:33,34,33 | names:nav,docs=b:https://x.com,logs")
+    }
+
+    @Test func serializeExplicitTerminalLosesTPrefix() {
+        let model = try! parser.parse("cols:100 | names:nav=t:")
+        let result = serializer.serialize(model)
+        #expect(result == "cols:100 | names:nav")
+    }
+
+    @Test func cellSpecRoundTrip() throws {
+        let input = "cols:33,34,33 | names:nav,docs=b:https://x.com,logs"
+        let model = try parser.parse(input)
+        let output = serializer.serialize(model)
+        #expect(output == input)
     }
 }

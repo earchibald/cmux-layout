@@ -1,22 +1,36 @@
 import Foundation
 
-/// Describes a complete cmux layout
+public enum SurfaceType: Equatable, Sendable {
+    case terminal
+    case browser(url: String?)
+}
+
+public struct CellSpec: Equatable, Sendable {
+    public let name: String?
+    public let type: SurfaceType
+
+    public init(name: String? = nil, type: SurfaceType = .terminal) {
+        self.name = name
+        self.type = type
+    }
+}
+
 public struct LayoutModel: Equatable, Sendable {
     public var workspaceName: String?
     public var columns: [Double]
     public var rows: [Int: [Double]]
-    public var names: [String]?
+    public var cells: [CellSpec]?
 
     public init(
         workspaceName: String? = nil,
         columns: [Double],
         rows: [Int: [Double]] = [:],
-        names: [String]? = nil
+        cells: [CellSpec]? = nil
     ) {
         self.workspaceName = workspaceName
         self.columns = columns
         self.rows = rows
-        self.names = names
+        self.cells = cells
     }
 
     public var cellCount: Int {

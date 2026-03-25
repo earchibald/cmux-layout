@@ -9,7 +9,9 @@ public struct LayoutResult {
 public struct CellInfo {
     public let surfaceRef: String
     public let paneRef: String
+    public let paneId: String
     public let name: String?
+    public let type: SurfaceType
     public let column: Int
     public let row: Int
 }
@@ -111,10 +113,13 @@ public struct Executor {
         }
 
         // 8. Collect cell map
-        let cells = try collectCells(workspaceId: wsId, model: model)
+        var cells = try collectCells(workspaceId: wsId, model: model)
 
-        // 9. Rename surfaces if names are specified
-        if model.names != nil {
+        // 9. Swap browser surfaces
+        try swapBrowserSurfaces(cells: &cells, workspaceId: wsId)
+
+        // 10. Rename surfaces if cells are specified
+        if model.cells != nil {
             try renameSurfaces(cells: cells, workspaceId: wsId)
         }
 
@@ -207,11 +212,13 @@ public struct Executor {
                 guard let surfRef = surf["ref"] as? String else { continue }
                 let col = cellIndex % model.columns.count
                 let row = cellIndex / model.columns.count
-                let name = model.names?[safe: cellIndex]
+                let cellSpec = model.cells?[safe: cellIndex]
                 cells.append(CellInfo(
                     surfaceRef: surfRef,
                     paneRef: paneRef,
-                    name: name,
+                    paneId: paneId,
+                    name: cellSpec?.name,
+                    type: cellSpec?.type ?? .terminal,
                     column: col,
                     row: row
                 ))
@@ -219,6 +226,41 @@ public struct Executor {
             }
         }
         return cells
+    }
+
+    private func swapBrowserSurfaces(cells: inout [CellInfo], workspaceId: String) throws {
+        for i in cells.indices {
+            guard case .browser(let url) = cells[i].type else { continue }
+
+            var createParams: [String: Any] = [
+                "workspace_id": workspaceId,
+                "pane_id": cells[i].paneId,
+                "type": "browser",
+            ]
+            if let url = url {
+                createParams["url"] = url
+            }
+
+            let createResp = try client.call(method: "surface.create", params: createParams)
+            guard let newSurfRef = createResp.result?["surface_ref"] as? String else {
+                throw ExecutorError.unexpectedResponse("surface.create browser")
+            }
+
+            _ = try client.call(method: "surface.close", params: [
+                "workspace_id": workspaceId,
+                "surface_id": cells[i].surfaceRef,
+            ])
+
+            cells[i] = CellInfo(
+                surfaceRef: newSurfRef,
+                paneRef: cells[i].paneRef,
+                paneId: cells[i].paneId,
+                name: cells[i].name,
+                type: cells[i].type,
+                column: cells[i].column,
+                row: cells[i].row
+            )
+        }
     }
 
     private func renameSurfaces(cells: [CellInfo], workspaceId: String) throws {
