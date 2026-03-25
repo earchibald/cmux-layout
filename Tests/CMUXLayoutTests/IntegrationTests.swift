@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import CMUXLayout
 
-@Suite("Integration Tests", .enabled(if: ProcessInfo.processInfo.environment["CMUX_INTEGRATION"] != nil))
+@Suite("Integration Tests", .serialized, .enabled(if: ProcessInfo.processInfo.environment["CMUX_INTEGRATION"] != nil))
 struct IntegrationTests {
     let client = LiveSocketClient()
 
@@ -13,7 +13,7 @@ struct IntegrationTests {
         #expect(result.cells.count == 4)
 
         // Cleanup
-        _ = try client.call(method: "workspace.close", params: ["workspace": result.workspaceRef])
+        _ = try client.call(method: "workspace.close", params: ["workspace_id": result.workspaceId])
     }
 
     @Test func applyWithWorkspaceName() throws {
@@ -23,7 +23,7 @@ struct IntegrationTests {
         #expect(result.cells.count == 2)
 
         // Cleanup
-        _ = try client.call(method: "workspace.close", params: ["workspace": result.workspaceRef])
+        _ = try client.call(method: "workspace.close", params: ["workspace_id": result.workspaceId])
     }
 
     @Test func applyUnevenCols() throws {
@@ -33,7 +33,7 @@ struct IntegrationTests {
         #expect(result.cells.count == 2)
 
         // Cleanup
-        _ = try client.call(method: "workspace.close", params: ["workspace": result.workspaceRef])
+        _ = try client.call(method: "workspace.close", params: ["workspace_id": result.workspaceId])
     }
 
     @Test func profileSaveLoadRoundTrip() throws {

@@ -69,9 +69,15 @@ public final class LiveSocketClient: CMUXSocketClient {
             throw SocketError.connectionFailed("connect() failed: \(errno)")
         }
 
-        // Send request
-        _ = requestData.withUnsafeBytes { ptr in
-            Darwin.send(fd, ptr.baseAddress!, requestData.count, 0)
+        // Set receive timeout (5 seconds)
+        var timeout = timeval(tv_sec: 5, tv_usec: 0)
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+
+        // Send request with newline terminator (required by cmux socket protocol)
+        var payload = requestData
+        payload.append(0x0A) // newline
+        _ = payload.withUnsafeBytes { ptr in
+            Darwin.send(fd, ptr.baseAddress!, payload.count, 0)
         }
 
         // Read response (loop until we get complete JSON)
