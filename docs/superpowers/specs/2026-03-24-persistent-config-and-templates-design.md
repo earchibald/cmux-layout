@@ -30,7 +30,7 @@ On first use of any command, if the file is missing, it is created with a scaffo
 
 ### Version Management
 
-The schema version is embedded as a comment (`# Version: N`) at the top of the file. On each run, cmux-layout compares the file version against the code's current schema version:
+The schema version is embedded as a comment (`# Version: N`) at the top of the file. `ConfigManager` reads the version by scanning the parser's ordered entry list for a comment matching the pattern `# Version: \d+` — no special parser API needed, just string matching on comment entries. When writing an upgraded file, the version comment is replaced in-place. On each run, cmux-layout compares the file version against the code's current schema version:
 
 - **File older than code:** Upgrade — append new commented-out sections, preserve existing values, prepend `# DEPRECATED:` warning to deprecated keys.
 - **File newer than code:** Error — "config.toml is version N but this binary supports up to version M. Please upgrade cmux-layout."
@@ -114,13 +114,11 @@ Templates are stored as TOML tables under `[templates]`:
 descriptor = "workspace:Dev | cols:25,50,25 | rows[0]:60,40"
 
 [templates.monitoring]
-name = "Monitoring Dashboard"
 descriptor = "grid:3x2"
 ```
 
-- **Key** (e.g., `dev`) is the identifier used in CLI commands
+- **Key** (e.g., `monitoring`) is the identifier used in CLI commands
 - **`descriptor`** (required) — compressed descriptor string
-- **`name`** (optional) — display name for `list` output
 - Future: expanded form fields will be added alongside `descriptor`
 
 ## Testing Strategy
