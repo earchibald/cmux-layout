@@ -66,4 +66,97 @@ struct DescriberTests {
         #expect(model.rows.isEmpty)
         #expect(Serializer().serialize(model) == "cols:25,50,25")
     }
+
+    @Test func describeColumnWithRowSplits() throws {
+        let client = makeClient()
+        stubPanes(client, panes: [
+            ["id": "P1", "ref": "pane:1", "x": 0.0, "y": 0.0, "width": 250.0, "height": 600.0],
+            ["id": "P2", "ref": "pane:2", "x": 0.0, "y": 600.0, "width": 250.0, "height": 400.0],
+            ["id": "P3", "ref": "pane:3", "x": 250.0, "y": 0.0, "width": 750.0, "height": 1000.0],
+        ])
+        enqueueSurfaces(client, surfaces: [["id": "S1", "ref": "surface:1", "type": "terminal", "title": ""]])
+        enqueueSurfaces(client, surfaces: [["id": "S2", "ref": "surface:2", "type": "terminal", "title": ""]])
+        enqueueSurfaces(client, surfaces: [["id": "S3", "ref": "surface:3", "type": "terminal", "title": ""]])
+
+        let model = try Describer(client: client).describe(workspace: "workspace:1")
+        #expect(model.columns == [25.0, 75.0])
+        #expect(model.rows[0] == [60.0, 40.0])
+        #expect(model.rows[1] == nil)
+        #expect(Serializer().serialize(model) == "cols:25,75 | rows[0]:60,40")
+    }
+
+    @Test func describeBrowserSurface() throws {
+        let client = makeClient()
+        stubPanes(client, panes: [
+            ["id": "P1", "ref": "pane:1", "x": 0.0, "y": 0.0, "width": 500.0, "height": 1000.0],
+            ["id": "P2", "ref": "pane:2", "x": 500.0, "y": 0.0, "width": 500.0, "height": 1000.0],
+        ])
+        enqueueSurfaces(client, surfaces: [["id": "S1", "ref": "surface:1", "type": "terminal", "title": "editor"]])
+        enqueueSurfaces(client, surfaces: [["id": "S2", "ref": "surface:2", "type": "browser", "title": "docs", "url": "https://example.com"]])
+
+        let descriptor = Serializer().serialize(try Describer(client: client).describe(workspace: "workspace:1"))
+        #expect(descriptor == "cols:50,50 | names:editor,docs=b:https://example.com")
+    }
+
+    @Test func describeSurfaceNames() throws {
+        let client = makeClient()
+        stubPanes(client, panes: [
+            ["id": "P1", "ref": "pane:1", "x": 0.0, "y": 0.0, "width": 333.0, "height": 1000.0],
+            ["id": "P2", "ref": "pane:2", "x": 333.0, "y": 0.0, "width": 334.0, "height": 1000.0],
+            ["id": "P3", "ref": "pane:3", "x": 667.0, "y": 0.0, "width": 333.0, "height": 1000.0],
+        ])
+        enqueueSurfaces(client, surfaces: [["id": "S1", "ref": "surface:1", "type": "terminal", "title": "nav"]])
+        enqueueSurfaces(client, surfaces: [["id": "S2", "ref": "surface:2", "type": "terminal", "title": "main"]])
+        enqueueSurfaces(client, surfaces: [["id": "S3", "ref": "surface:3", "type": "terminal", "title": "logs"]])
+
+        let descriptor = Serializer().serialize(try Describer(client: client).describe(workspace: "workspace:1"))
+        #expect(descriptor.contains("names:nav,main,logs"))
+    }
+
+    @Test func describeWithWorkspaceName() throws {
+        let client = makeClient(workspaceTitle: "Dev")
+        stubPanes(client, panes: [["id": "P1", "ref": "pane:1"]])
+        stubSurfaces(client, surfaces: [["id": "S1", "ref": "surface:1", "type": "terminal", "title": ""]])
+
+        let descriptor = Serializer().serialize(try Describer(client: client).describe(workspace: "workspace:1", includeWorkspaceName: true))
+        #expect(descriptor.hasPrefix("workspace:Dev"))
+    }
+
+    @Test func describeWorkspaceNotFound() throws {
+        let client = RecordingSocketClient()
+        client.stub(method: "workspace.list", result: ["workspaces": [] as [[String: Any]]])
+
+        #expect(throws: DescriberError.workspaceNotFound("workspace:99")) {
+            try Describer(client: client).describe(workspace: "workspace:99")
+        }
+    }
+
+    @Test func describeEmptyPaneList() throws {
+        let client = makeClient()
+        stubPanes(client, panes: [])
+
+        #expect(throws: DescriberError.cannotReadTopology) {
+            try Describer(client: client).describe(workspace: "workspace:1")
+        }
+    }
+
+    @Test func describeOutputParsesBack() throws {
+        let client = makeClient()
+        stubPanes(client, panes: [
+            ["id": "P1", "ref": "pane:1", "x": 0.0, "y": 0.0, "width": 250.0, "height": 600.0],
+            ["id": "P2", "ref": "pane:2", "x": 0.0, "y": 600.0, "width": 250.0, "height": 400.0],
+            ["id": "P3", "ref": "pane:3", "x": 250.0, "y": 0.0, "width": 500.0, "height": 1000.0],
+            ["id": "P4", "ref": "pane:4", "x": 750.0, "y": 0.0, "width": 250.0, "height": 1000.0],
+        ])
+        enqueueSurfaces(client, surfaces: [["id": "S1", "ref": "surface:1", "type": "terminal", "title": "nav"]])
+        enqueueSurfaces(client, surfaces: [["id": "S2", "ref": "surface:2", "type": "terminal", "title": "sidebar"]])
+        enqueueSurfaces(client, surfaces: [["id": "S3", "ref": "surface:3", "type": "terminal", "title": "main"]])
+        enqueueSurfaces(client, surfaces: [["id": "S4", "ref": "surface:4", "type": "browser", "title": "docs", "url": "https://x.com"]])
+
+        let model = try Describer(client: client).describe(workspace: "workspace:1")
+        let descriptor = Serializer().serialize(model)
+        let parsed = try Parser().parse(descriptor)
+        #expect(parsed.columns.count == model.columns.count)
+        #expect(parsed.cellCount == model.cellCount)
+    }
 }
