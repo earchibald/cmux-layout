@@ -25,7 +25,9 @@ struct SerializerTests {
     }
 
     @Test func serializeNames() {
-        let model = LayoutModel(columns: [50, 50], names: ["a", "b"])
+        let model = LayoutModel(columns: [50, 50], cells: [
+            CellSpec(name: "a"), CellSpec(name: "b")
+        ])
         let result = serializer.serialize(model)
         #expect(result == "cols:50,50 | names:a,b")
     }

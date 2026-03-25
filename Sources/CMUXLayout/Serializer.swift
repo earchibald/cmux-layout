@@ -10,8 +10,8 @@ public struct Serializer: Sendable {
                 parts.append("workspace:\(name)")
             }
             parts.append(gridStr)
-            if let names = model.names {
-                parts.append("names:\(names.joined(separator: ","))")
+            if let cells = model.cells {
+                parts.append("names:\(cells.map { $0.name ?? "" }.joined(separator: ","))")
             }
             return parts.joined(separator: " | ")
         }
@@ -37,8 +37,8 @@ public struct Serializer: Sendable {
             }
         }
 
-        if let names = model.names {
-            parts.append("names:\(names.joined(separator: ","))")
+        if let cells = model.cells {
+            parts.append("names:\(cells.map { $0.name ?? "" }.joined(separator: ","))")
         }
 
         return parts.joined(separator: " | ")

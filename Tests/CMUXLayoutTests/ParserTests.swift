@@ -69,7 +69,8 @@ struct ParserTests {
 
     @Test func parseNames() throws {
         let model = try parser.parse("cols:30,70 | rows[0]:50,50 | names:editor,terminal,preview")
-        #expect(model.names == ["editor", "terminal", "preview"])
+        let cells = try #require(model.cells)
+        #expect(cells.map(\.name) == ["editor", "terminal", "preview"])
         #expect(model.cellCount == 3)
     }
 
@@ -95,6 +96,16 @@ struct ParserTests {
         #expect(throws: ParseError.columnIndexOutOfRange(5)) {
             try parser.parse("cols:50,50 | rows[5]:50,50")
         }
+    }
+
+    // MARK: - CellSpec parsing
+
+    @Test func parseBareNamesAsCellSpecs() throws {
+        let model = try parser.parse("cols:50,50 | names:nav,main")
+        let cells = try #require(model.cells)
+        #expect(cells.count == 2)
+        #expect(cells[0] == CellSpec(name: "nav", type: .terminal))
+        #expect(cells[1] == CellSpec(name: "main", type: .terminal))
     }
 
     @Test func parseNormalizesPercentages() throws {

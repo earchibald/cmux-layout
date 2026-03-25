@@ -114,7 +114,7 @@ public struct Executor {
         let cells = try collectCells(workspaceId: wsId, model: model)
 
         // 9. Rename surfaces if names are specified
-        if model.names != nil {
+        if model.cells != nil {
             try renameSurfaces(cells: cells, workspaceId: wsId)
         }
 
@@ -207,7 +207,7 @@ public struct Executor {
                 guard let surfRef = surf["ref"] as? String else { continue }
                 let col = cellIndex % model.columns.count
                 let row = cellIndex / model.columns.count
-                let name = model.names?[safe: cellIndex]
+                let name = model.cells?[safe: cellIndex]?.name
                 cells.append(CellInfo(
                     surfaceRef: surfRef,
                     paneRef: paneRef,

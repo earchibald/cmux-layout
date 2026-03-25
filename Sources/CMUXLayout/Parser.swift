@@ -15,7 +15,7 @@ public struct Parser: Sendable {
         var columns: [Double]?
         var globalRows: [Double]?
         var indexedRows: [Int: [Double]] = [:]
-        var names: [String]?
+        var cells: [CellSpec]?
 
         for segment in segments {
             if segment.hasPrefix("workspace:") {
@@ -52,9 +52,10 @@ public struct Parser: Sendable {
             } else if segment.hasPrefix("rows:") {
                 globalRows = try parsePercentages(String(segment.dropFirst("rows:".count)))
             } else if segment.hasPrefix("names:") {
-                names = String(segment.dropFirst("names:".count))
+                let tokens = String(segment.dropFirst("names:".count))
                     .split(separator: ",")
                     .map { $0.trimmingCharacters(in: .whitespaces) }
+                cells = tokens.map { CellSpec(name: $0, type: .terminal) }
             } else {
                 throw ParseError.invalidSegment(segment)
             }
@@ -82,13 +83,13 @@ public struct Parser: Sendable {
             workspaceName: workspaceName,
             columns: normalize(cols),
             rows: indexedRows.mapValues { normalize($0) },
-            names: names
+            cells: cells
         )
 
-        if let n = names {
+        if let c = cells {
             let expected = model.cellCount
-            guard n.count == expected else {
-                throw ParseError.nameCountMismatch(expected: expected, got: n.count)
+            guard c.count == expected else {
+                throw ParseError.nameCountMismatch(expected: expected, got: c.count)
             }
         }
 
