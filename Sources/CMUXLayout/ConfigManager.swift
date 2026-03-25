@@ -161,6 +161,42 @@ public struct ConfigManager: Sendable {
         try persist()
     }
 
+    // MARK: - Model loading
+
+    public func loadModel(name: String) throws -> LayoutModel {
+        let descriptor = try load(name: name)
+        var model = try Parser().parse(descriptor)
+
+        let cellTablePrefix = "templates.\(name).cells."
+        let cellTables = document.tablesWithPrefix(cellTablePrefix)
+        guard !cellTables.isEmpty else { return model }
+
+        var overrides: [String: CellSpec] = [:]
+        for tableName in cellTables {
+            let cellName = String(tableName.dropFirst(cellTablePrefix.count))
+            let typeStr = document.getString(table: tableName, key: "type") ?? "terminal"
+            let url = document.getString(table: tableName, key: "url")
+            let surfaceType: SurfaceType
+            if typeStr == "browser" {
+                surfaceType = .browser(url: url)
+            } else {
+                surfaceType = .terminal
+            }
+            overrides[cellName] = CellSpec(name: cellName, type: surfaceType)
+        }
+
+        if var cells = model.cells {
+            for i in cells.indices {
+                if let name = cells[i].name, let override = overrides[name] {
+                    cells[i] = override
+                }
+            }
+            model.cells = cells
+        }
+
+        return model
+    }
+
     // MARK: - Settings
 
     public func getSetting(key: String) -> String? {

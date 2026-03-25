@@ -169,4 +169,71 @@ struct ConfigManagerTests {
         #expect(updated.contains("# Version: \(ConfigManager.currentSchemaVersion)"))
         #expect(updated.contains("[templates]"))
     }
+
+    // MARK: - Cell table merge
+
+    @Test func loadModelReturnsLayoutModel() throws {
+        let dir = makeTempDir()
+        defer { cleanup(dir) }
+        let path = dir + "/config.toml"
+        var mgr = try ConfigManager(path: path)
+        try mgr.save(name: "dev", descriptor: "cols:50,50 | names:nav,main")
+        let model = try mgr.loadModel(name: "dev")
+        #expect(model.columns.count == 2)
+        #expect(model.cells?.count == 2)
+        #expect(model.cells?[0].name == "nav")
+    }
+
+    @Test func loadModelMergesTomlCellTables() throws {
+        let dir = makeTempDir()
+        defer { cleanup(dir) }
+        let path = dir + "/config.toml"
+        var mgr = try ConfigManager(path: path)
+        try mgr.save(name: "dev", descriptor: "cols:50,50 | names:nav,docs")
+
+        let content = try String(contentsOfFile: path, encoding: .utf8)
+        let updated = content + "\n\n[templates.dev.cells.docs]\ntype = \"browser\"\nurl = \"https://docs.example.com\""
+        try updated.write(toFile: path, atomically: true, encoding: .utf8)
+
+        let mgr2 = try ConfigManager(path: path)
+        let model = try mgr2.loadModel(name: "dev")
+        let cells = try #require(model.cells)
+        #expect(cells[0] == CellSpec(name: "nav", type: .terminal))
+        #expect(cells[1] == CellSpec(name: "docs", type: .browser(url: "https://docs.example.com")))
+    }
+
+    @Test func tomlCellTableOverridesInlineSpec() throws {
+        let dir = makeTempDir()
+        defer { cleanup(dir) }
+        let path = dir + "/config.toml"
+        var mgr = try ConfigManager(path: path)
+        try mgr.save(name: "dev", descriptor: "cols:100 | names:docs=b:https://old.com")
+
+        let content = try String(contentsOfFile: path, encoding: .utf8)
+        let updated = content + "\n\n[templates.dev.cells.docs]\ntype = \"browser\"\nurl = \"https://new.com\""
+        try updated.write(toFile: path, atomically: true, encoding: .utf8)
+
+        let mgr2 = try ConfigManager(path: path)
+        let model = try mgr2.loadModel(name: "dev")
+        let cells = try #require(model.cells)
+        #expect(cells[0] == CellSpec(name: "docs", type: .browser(url: "https://new.com")))
+    }
+
+    @Test func missingTomlCellDefaultsToTerminal() throws {
+        let dir = makeTempDir()
+        defer { cleanup(dir) }
+        let path = dir + "/config.toml"
+        var mgr = try ConfigManager(path: path)
+        try mgr.save(name: "dev", descriptor: "cols:50,50 | names:nav,docs")
+
+        let content = try String(contentsOfFile: path, encoding: .utf8)
+        let updated = content + "\n\n[templates.dev.cells.docs]\ntype = \"browser\""
+        try updated.write(toFile: path, atomically: true, encoding: .utf8)
+
+        let mgr2 = try ConfigManager(path: path)
+        let model = try mgr2.loadModel(name: "dev")
+        let cells = try #require(model.cells)
+        #expect(cells[0] == CellSpec(name: "nav", type: .terminal))
+        #expect(cells[1] == CellSpec(name: "docs", type: .browser(url: nil)))
+    }
 }

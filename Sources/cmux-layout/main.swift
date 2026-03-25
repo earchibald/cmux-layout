@@ -196,8 +196,7 @@ enum CLI {
             exit(1)
         }
         let config = try ConfigManager()
-        let descriptor = try config.load(name: templateName)
-        let model = try Parser().parse(descriptor)
+        let model = try config.loadModel(name: templateName)
         let client = LiveSocketClient()
         let executor = Executor(client: client)
         let result = try executor.apply(model, workspace: workspace)
