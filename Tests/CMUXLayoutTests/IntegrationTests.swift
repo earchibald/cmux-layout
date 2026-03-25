@@ -36,14 +36,16 @@ struct IntegrationTests {
         _ = try client.call(method: "workspace.close", params: ["workspace_id": result.workspaceId])
     }
 
-    @Test func profileSaveLoadRoundTrip() throws {
-        let store = ProfileStore(path: "/tmp/cmux-layout-test-profiles.json")
+    @Test func configSaveLoadRoundTrip() throws {
+        let path = "/tmp/cmux-layout-test-config-\(UUID().uuidString)/config.toml"
+        var config = try ConfigManager(path: path)
         let descriptor = "cols:50,50 | rows:50,50"
-        try store.save(name: "test-profile", descriptor: descriptor)
-        let loaded = try store.load("test-profile")
+        try config.save(name: "test-template", descriptor: descriptor)
+        let loaded = try config.load(name: "test-template")
         #expect(loaded == descriptor)
 
         // Cleanup
-        try? FileManager.default.removeItem(atPath: "/tmp/cmux-layout-test-profiles.json")
+        let dir = (path as NSString).deletingLastPathComponent
+        try? FileManager.default.removeItem(atPath: dir)
     }
 }
