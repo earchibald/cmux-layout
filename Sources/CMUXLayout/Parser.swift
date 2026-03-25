@@ -55,7 +55,7 @@ public struct Parser: Sendable {
                 let tokens = String(segment.dropFirst("names:".count))
                     .split(separator: ",")
                     .map { $0.trimmingCharacters(in: .whitespaces) }
-                cells = tokens.map { CellSpec(name: $0, type: .terminal) }
+                cells = tokens.map { parseCellSpec($0) }
             } else {
                 throw ParseError.invalidSegment(segment)
             }
@@ -94,6 +94,25 @@ public struct Parser: Sendable {
         }
 
         return model
+    }
+
+    private func parseCellSpec(_ token: String) -> CellSpec {
+        if let eqIndex = token.firstIndex(of: "=") {
+            let name = String(token[token.startIndex..<eqIndex])
+            let remainder = String(token[token.index(after: eqIndex)...])
+            if remainder.hasPrefix("b:") {
+                let urlStr = String(remainder.dropFirst(2))
+                return CellSpec(name: name, type: .browser(url: urlStr.isEmpty ? nil : urlStr))
+            } else if remainder.hasPrefix("t:") {
+                return CellSpec(name: name, type: .terminal)
+            }
+            return CellSpec(name: token, type: .terminal)
+        }
+        if token.hasPrefix("b:") {
+            let urlStr = String(token.dropFirst(2))
+            return CellSpec(name: nil, type: .browser(url: urlStr.isEmpty ? nil : urlStr))
+        }
+        return CellSpec(name: token, type: .terminal)
     }
 
     private func parsePercentages(_ str: String) throws -> [Double] {

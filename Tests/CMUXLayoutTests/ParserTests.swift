@@ -113,4 +113,49 @@ struct ParserTests {
         let sum = model.columns.reduce(0, +)
         #expect(abs(sum - 100) < 0.01)
     }
+
+    @Test func parseNamedBrowserWithUrl() throws {
+        let model = try parser.parse("cols:100 | names:docs=b:https://x.com")
+        let cells = try #require(model.cells)
+        #expect(cells[0] == CellSpec(name: "docs", type: .browser(url: "https://x.com")))
+    }
+
+    @Test func parseUnnamedBrowserWithUrl() throws {
+        let model = try parser.parse("cols:100 | names:b:https://x.com")
+        let cells = try #require(model.cells)
+        #expect(cells[0] == CellSpec(name: nil, type: .browser(url: "https://x.com")))
+    }
+
+    @Test func parseBlankBrowser() throws {
+        let model = try parser.parse("cols:100 | names:b:")
+        let cells = try #require(model.cells)
+        #expect(cells[0] == CellSpec(name: nil, type: .browser(url: nil)))
+    }
+
+    @Test func parseNamedBlankBrowser() throws {
+        let model = try parser.parse("cols:100 | names:docs=b:")
+        let cells = try #require(model.cells)
+        #expect(cells[0] == CellSpec(name: "docs", type: .browser(url: nil)))
+    }
+
+    @Test func parseExplicitTerminal() throws {
+        let model = try parser.parse("cols:100 | names:nav=t:")
+        let cells = try #require(model.cells)
+        #expect(cells[0] == CellSpec(name: "nav", type: .terminal))
+    }
+
+    @Test func parseMixedCellSpecs() throws {
+        let model = try parser.parse("cols:33,34,33 | names:nav,docs=b:https://x.com,logs")
+        let cells = try #require(model.cells)
+        #expect(cells.count == 3)
+        #expect(cells[0] == CellSpec(name: "nav", type: .terminal))
+        #expect(cells[1] == CellSpec(name: "docs", type: .browser(url: "https://x.com")))
+        #expect(cells[2] == CellSpec(name: "logs", type: .terminal))
+    }
+
+    @Test func parseCellCountValidationStillWorks() throws {
+        #expect(throws: ParseError.self) {
+            try parser.parse("cols:50,50 | names:only-one")
+        }
+    }
 }
