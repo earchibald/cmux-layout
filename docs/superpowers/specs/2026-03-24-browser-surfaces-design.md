@@ -69,17 +69,18 @@ The `names:` segment parsing is extended to handle the cell spec grammar. For ea
 
 The parser produces `[CellSpec]` which is stored in `LayoutModel.cells`.
 
+**Tokenization note:** The `names:` segment is comma-split into tokens, then each token is parsed individually for the cell spec grammar. This comma split is independent of `parsePercentages` — cell spec tokens contain `=`, `b:`, and URLs, not numeric values.
+
 ## Serializer Changes
 
 The `Serializer` round-trips `CellSpec` back to compact syntax:
 - Terminal with name → `name`
-- Terminal with name and explicit type → `name=t:`
 - Browser with name and URL → `name=b:url`
 - Browser with name, no URL → `name=b:`
 - Browser without name, with URL → `b:url`
 - Browser without name, no URL → `b:`
 
-Only emit `t:` prefix when the CellSpec was explicitly typed (to preserve round-trip fidelity). Default behavior: omit `t:` for terminals.
+Terminals never emit a `t:` prefix — the serializer always uses the bare name form. The `name=t:` syntax is accepted by the parser but is not produced by the serializer. This avoids needing to track whether terminal type was explicit vs. defaulted.
 
 ## Executor Changes
 
@@ -122,7 +123,7 @@ url = "https://docs.example.com"
 
 ### ConfigManager Changes
 
-- `load(name:)` returns a `LayoutModel` instead of a raw descriptor string. It parses the descriptor and merges any TOML cell tables.
+- `load(name:)` returns a `LayoutModel` instead of a raw descriptor string. It parses the descriptor and merges any TOML cell tables. The `Executor.apply` already accepts `LayoutModel`, so `handleLoad` in `main.swift` passes the model directly — no need for the raw descriptor string.
 - `save(name:descriptor:)` stores the compact descriptor as-is. TOML cell tables are hand-edited by users. No CLI support for writing cell tables (YAGNI for now).
 
 ### TOML Parser Note
