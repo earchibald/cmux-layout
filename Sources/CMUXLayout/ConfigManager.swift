@@ -161,6 +161,17 @@ public struct ConfigManager: Sendable {
         try persist()
     }
 
+    // MARK: - Settings
+
+    public func getSetting(key: String) -> String? {
+        document.getString(table: "settings", key: key)
+    }
+
+    public mutating func setSetting(key: String, value: String) throws {
+        document.setString(table: "settings", key: key, value: value)
+        try persist()
+    }
+
     // MARK: - Persistence
 
     private func persist() throws {

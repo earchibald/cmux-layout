@@ -118,6 +118,23 @@ struct ConfigManagerTests {
         #expect(loaded == "grid:3x3")
     }
 
+    // MARK: - Settings
+
+    @Test func getSettingReturnsNilWhenEmpty() throws {
+        let dir = makeTempDir()
+        defer { cleanup(dir) }
+        let mgr = try ConfigManager(path: dir + "/config.toml")
+        #expect(mgr.getSetting(key: "anything") == nil)
+    }
+
+    @Test func setAndGetSetting() throws {
+        let dir = makeTempDir()
+        defer { cleanup(dir) }
+        var mgr = try ConfigManager(path: dir + "/config.toml")
+        try mgr.setSetting(key: "some-option", value: "enabled")
+        #expect(mgr.getSetting(key: "some-option") == "enabled")
+    }
+
     // MARK: - Version management
 
     @Test func rejectNewerVersion() throws {
