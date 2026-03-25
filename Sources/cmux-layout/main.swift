@@ -27,6 +27,8 @@ enum CLI {
                 try handleLoad(Array(args.dropFirst()))
             case "list":
                 try handleList()
+            case "config":
+                try handleConfig(Array(args.dropFirst()))
             case "--help", "-h":
                 printUsage()
             default:
@@ -43,6 +45,9 @@ enum CLI {
         } catch let error as ExecutorError {
             fputs("Layout error: \(error)\n", stderr)
             exit(3)
+        } catch let error as ConfigError {
+            fputs("Config error: \(error)\n", stderr)
+            exit(1)
         } catch {
             fputs("Error: \(error)\n", stderr)
             exit(1)
@@ -168,9 +173,9 @@ enum CLI {
         }
         let name = args[0]
         let descriptor = args[1]
-        _ = try Parser().parse(descriptor)
-        try ProfileStore().save(name: name, descriptor: descriptor)
-        print("Saved profile '\(name)'")
+        var config = try ConfigManager()
+        try config.save(name: name, descriptor: descriptor)
+        print("Saved template '\(name)'")
     }
 
     static func handleLoad(_ args: [String]) throws {
@@ -186,26 +191,60 @@ enum CLI {
             }
             i += 1
         }
-        guard let profileName = name else {
+        guard let templateName = name else {
             fputs("Usage: cmux-layout load [--workspace WS] <name>\n", stderr)
             exit(1)
         }
-        let descriptor = try ProfileStore().load(profileName)
+        let config = try ConfigManager()
+        let descriptor = try config.load(name: templateName)
         let model = try Parser().parse(descriptor)
         let client = LiveSocketClient()
         let executor = Executor(client: client)
         let result = try executor.apply(model, workspace: workspace)
-        print("Loaded profile '\(profileName)' -> \(result.workspaceRef)")
+        print("Loaded template '\(templateName)' -> \(result.workspaceRef)")
     }
 
     static func handleList() throws {
-        let profiles = try ProfileStore().list()
-        if profiles.isEmpty {
-            print("No saved profiles")
+        let config = try ConfigManager()
+        let templates = try config.list()
+        if templates.isEmpty {
+            print("No saved templates")
         } else {
-            for (name, descriptor) in profiles.sorted(by: { $0.key < $1.key }) {
-                print("  \(name): \(descriptor)")
+            for t in templates {
+                print("  \(t.name): \(t.descriptor)")
             }
+        }
+    }
+
+    static func handleConfig(_ args: [String]) throws {
+        guard let sub = args.first else {
+            fputs("Usage: cmux-layout config <path|show|init>\n", stderr)
+            exit(1)
+        }
+        switch sub {
+        case "path":
+            let config = try ConfigManager()
+            print(config.configPath)
+        case "show":
+            let config = try ConfigManager()
+            let content = try String(contentsOfFile: config.configPath, encoding: .utf8)
+            print(content)
+        case "init":
+            let force = args.contains("--force")
+            let path = ConfigManager.defaultPath
+            if FileManager.default.fileExists(atPath: path) && !force {
+                fputs("Config file already exists at \(path). Use --force to overwrite.\n", stderr)
+                exit(1)
+            }
+            if force {
+                try? FileManager.default.removeItem(atPath: path)
+            }
+            let _ = try ConfigManager()
+            print("Initialized config at \(path)")
+        default:
+            fputs("Unknown config command: \(sub)\n", stderr)
+            fputs("Usage: cmux-layout config <path|show|init>\n", stderr)
+            exit(1)
         }
     }
 
@@ -221,6 +260,9 @@ enum CLI {
           cmux-layout save <name> <descriptor>
           cmux-layout load [--workspace WS] <name>
           cmux-layout list
+          cmux-layout config path
+          cmux-layout config show
+          cmux-layout config init [--force]
 
         Descriptor examples:
           grid:3x3
