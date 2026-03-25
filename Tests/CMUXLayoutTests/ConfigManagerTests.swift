@@ -117,4 +117,39 @@ struct ConfigManagerTests {
         let loaded = try mgr.load(name: "dev")
         #expect(loaded == "grid:3x3")
     }
+
+    // MARK: - Version management
+
+    @Test func rejectNewerVersion() throws {
+        let dir = makeTempDir()
+        defer { cleanup(dir) }
+        let path = dir + "/config.toml"
+        let content = """
+        # cmux-layout configuration
+        # Version: 999
+
+        [settings]
+        """
+        try content.write(toFile: path, atomically: true, encoding: .utf8)
+        #expect(throws: ConfigError.self) {
+            try ConfigManager(path: path)
+        }
+    }
+
+    @Test func upgradeFromOlderVersion() throws {
+        let dir = makeTempDir()
+        defer { cleanup(dir) }
+        let path = dir + "/config.toml"
+        let content = """
+        # cmux-layout configuration
+        # Version: 0
+
+        [settings]
+        """
+        try content.write(toFile: path, atomically: true, encoding: .utf8)
+        let _ = try ConfigManager(path: path)
+        let updated = try String(contentsOfFile: path, encoding: .utf8)
+        #expect(updated.contains("# Version: \(ConfigManager.currentSchemaVersion)"))
+        #expect(updated.contains("[templates]"))
+    }
 }

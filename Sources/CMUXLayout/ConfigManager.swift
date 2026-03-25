@@ -62,13 +62,56 @@ public struct ConfigManager: Sendable {
         return nil
     }
 
-    private func checkVersion() throws {
-        guard let version = fileVersion() else { return }
+    private mutating func checkVersion() throws {
+        let version = fileVersion() ?? 0
         if version > Self.currentSchemaVersion {
             throw ConfigError.versionTooNew(
                 fileVersion: version,
                 maxSupported: Self.currentSchemaVersion
             )
+        }
+        if version < Self.currentSchemaVersion {
+            try upgradeFrom(version: version)
+        }
+    }
+
+    private mutating func upgradeFrom(version: Int) throws {
+        var v = version
+
+        if v < 1 {
+            // v0 -> v1: ensure [templates] section exists
+            let hasTemplates = document.tablesWithPrefix("templates").contains(where: { $0 == "templates" })
+                || !document.tablesWithPrefix("templates.").isEmpty
+            if !hasTemplates {
+                document.insertTable("templates", after: "settings")
+                // Add scaffold comments after the [templates] header
+                if let range = document.tableRange("templates") {
+                    let comments = [
+                        "# Save workspace templates using: cmux-layout save <name> <descriptor>",
+                        "# Example:",
+                        "# [templates.dev]",
+                        #"# descriptor = "workspace:Dev | cols:25,50,25 | rows[0]:60,40""#,
+                    ]
+                    for (offset, comment) in comments.enumerated() {
+                        document.entries.insert(.comment(comment), at: range.headerIndex + 1 + offset)
+                    }
+                }
+            }
+            v = 1
+        }
+
+        // Update version comment
+        updateVersionComment(to: Self.currentSchemaVersion)
+        try persist()
+    }
+
+    private mutating func updateVersionComment(to version: Int) {
+        for (i, entry) in document.entries.enumerated() {
+            if case .comment(let text) = entry,
+               text.trimmingCharacters(in: .whitespaces).hasPrefix("# Version:") {
+                document.entries[i] = .comment("# Version: \(version)")
+                return
+            }
         }
     }
 
