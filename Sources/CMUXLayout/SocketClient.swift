@@ -74,10 +74,13 @@ public final class LiveSocketClient: CMUXSocketClient {
         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
 
         // Send request with newline terminator (required by cmux socket protocol)
-        var payload = requestData
-        payload.append(0x0A) // newline
-        _ = payload.withUnsafeBytes { ptr in
-            Darwin.send(fd, ptr.baseAddress!, payload.count, 0)
+        var payloadBytes = [UInt8](requestData)
+        payloadBytes.append(0x0A) // newline
+        let sent = payloadBytes.withUnsafeBufferPointer { ptr in
+            Darwin.send(fd, ptr.baseAddress!, ptr.count, 0)
+        }
+        guard sent == payloadBytes.count else {
+            throw SocketError.connectionFailed("send() failed: sent \(sent) of \(payloadBytes.count)")
         }
 
         // Read response (loop until we get complete JSON)
