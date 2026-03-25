@@ -46,7 +46,7 @@ public struct Serializer: Sendable {
 
     private func serializeCellSpec(_ cell: CellSpec) -> String {
         switch cell.type {
-        case .terminal:
+        case .terminal(_):
             return cell.name ?? ""
         case .browser(let url):
             let urlPart = url ?? ""

@@ -1,7 +1,7 @@
 import Foundation
 
 public enum SurfaceType: Equatable, Sendable {
-    case terminal
+    case terminal(command: String?)
     case browser(url: String?)
 }
 
@@ -9,7 +9,7 @@ public struct CellSpec: Equatable, Sendable {
     public let name: String?
     public let type: SurfaceType
 
-    public init(name: String? = nil, type: SurfaceType = .terminal) {
+    public init(name: String? = nil, type: SurfaceType = .terminal(command: nil)) {
         self.name = name
         self.type = type
     }

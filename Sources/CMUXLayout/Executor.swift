@@ -1,5 +1,26 @@
 import Foundation
 
+/// Closure type for sending commands to terminal surfaces.
+public typealias CommandSender = (String, String, String) -> Void
+
+/// Default command sender that shells out to cmux send CLI.
+public func defaultCommandSender(surfaceRef: String, workspaceId: String, command: String) {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["cmux", "send", "--workspace", workspaceId, "--surface", surfaceRef, command + "\n"]
+    process.standardOutput = nil
+    process.standardError = FileHandle.nullDevice
+    do {
+        try process.run()
+        process.waitUntilExit()
+        if process.terminationStatus != 0 {
+            fputs("Warning: cmux send failed for \(surfaceRef)\n", stderr)
+        }
+    } catch {
+        fputs("Warning: could not run cmux send: \(error)\n", stderr)
+    }
+}
+
 public struct LayoutResult {
     public let workspaceRef: String
     public let workspaceId: String
@@ -18,11 +39,13 @@ public struct CellInfo {
 
 public struct Executor {
     private let client: CMUXSocketClient
+    private let commandSender: CommandSender
     private let maxResizeIterations = 3
     private let resizeTolerance = 0.02
 
-    public init(client: CMUXSocketClient) {
+    public init(client: CMUXSocketClient, commandSender: CommandSender? = nil) {
         self.client = client
+        self.commandSender = commandSender ?? defaultCommandSender
     }
 
     public func apply(_ model: LayoutModel, workspace: String? = nil) throws -> LayoutResult {
@@ -123,7 +146,19 @@ public struct Executor {
             try renameSurfaces(cells: cells, workspaceId: wsId)
         }
 
+        // 11. Inject commands into terminal surfaces
+        injectCommands(cells: cells, workspaceId: wsId)
+
         return LayoutResult(workspaceRef: wsRef, workspaceId: wsId, cells: cells)
+    }
+
+    private func injectCommands(cells: [CellInfo], workspaceId: String) {
+        for cell in cells {
+            guard case .terminal(let command) = cell.type, let cmd = command else { continue }
+            let interpolated = Interpolator.resolve(cmd)
+            Thread.sleep(forTimeInterval: 0.1)
+            commandSender(cell.surfaceRef, workspaceId, interpolated)
+        }
     }
 
     private func performResizes(_ resizes: [ResizeOp], workspaceId: String) throws {
@@ -218,7 +253,7 @@ public struct Executor {
                     paneRef: paneRef,
                     paneId: paneId,
                     name: cellSpec?.name,
-                    type: cellSpec?.type ?? .terminal,
+                    type: cellSpec?.type ?? .terminal(command: nil),
                     column: col,
                     row: row
                 ))

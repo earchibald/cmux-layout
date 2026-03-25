@@ -187,4 +187,81 @@ struct ExecutorTests {
         #expect(renameCalls[0].params["surface_id"] as? String == "surface:99")
         #expect(renameCalls[0].params["title"] as? String == "docs")
     }
+
+    // MARK: - Command injection
+
+    @Test func commandInjectedForTerminalWithCommand() throws {
+        let client = makeClient()
+        var sentCommands: [(surface: String, command: String)] = []
+        let sender: CommandSender = { surface, workspace, command in
+            sentCommands.append((surface: surface, command: command))
+        }
+
+        let model = LayoutModel(
+            columns: [100],
+            cells: [CellSpec(name: "editor", type: .terminal(command: "nvim"))]
+        )
+        let executor = Executor(client: client, commandSender: sender)
+        let _ = try executor.apply(model)
+
+        #expect(sentCommands.count == 1)
+        #expect(sentCommands[0].command == "nvim")
+    }
+
+    @Test func noCommandInjectionForTerminalWithoutCommand() throws {
+        let client = makeClient()
+        var sentCommands: [(surface: String, command: String)] = []
+        let sender: CommandSender = { surface, workspace, command in
+            sentCommands.append((surface: surface, command: command))
+        }
+
+        let model = LayoutModel(
+            columns: [100],
+            cells: [CellSpec(name: "shell", type: .terminal(command: nil))]
+        )
+        let executor = Executor(client: client, commandSender: sender)
+        let _ = try executor.apply(model)
+
+        #expect(sentCommands.isEmpty)
+    }
+
+    @Test func noCommandInjectionForBrowser() throws {
+        let client = makeClient()
+        client.stub(method: "surface.create", result: [
+            "surface_id": "BROWSER-SURF-UUID", "surface_ref": "surface:99",
+        ])
+        client.stub(method: "surface.close", result: [:])
+
+        var sentCommands: [(surface: String, command: String)] = []
+        let sender: CommandSender = { surface, workspace, command in
+            sentCommands.append((surface: surface, command: command))
+        }
+
+        let model = LayoutModel(
+            columns: [100],
+            cells: [CellSpec(name: "docs", type: .browser(url: "https://x.com"))]
+        )
+        let executor = Executor(client: client, commandSender: sender)
+        let _ = try executor.apply(model)
+
+        #expect(sentCommands.isEmpty)
+    }
+
+    @Test func commandIsInterpolated() throws {
+        let client = makeClient()
+        var sentCommands: [(surface: String, command: String)] = []
+        let sender: CommandSender = { surface, workspace, command in
+            sentCommands.append((surface: surface, command: command))
+        }
+
+        let model = LayoutModel(
+            columns: [100],
+            cells: [CellSpec(name: "editor", type: .terminal(command: "cd ${MISSING:-/tmp} && nvim"))]
+        )
+        let executor = Executor(client: client, commandSender: sender)
+        let _ = try executor.apply(model)
+
+        #expect(sentCommands.count == 1)
+        #expect(sentCommands[0].command == "cd /tmp && nvim")
+    }
 }

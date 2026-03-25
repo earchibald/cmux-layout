@@ -104,8 +104,8 @@ struct ParserTests {
         let model = try parser.parse("cols:50,50 | names:nav,main")
         let cells = try #require(model.cells)
         #expect(cells.count == 2)
-        #expect(cells[0] == CellSpec(name: "nav", type: .terminal))
-        #expect(cells[1] == CellSpec(name: "main", type: .terminal))
+        #expect(cells[0] == CellSpec(name: "nav", type: .terminal(command: nil)))
+        #expect(cells[1] == CellSpec(name: "main", type: .terminal(command: nil)))
     }
 
     @Test func parseNormalizesPercentages() throws {
@@ -141,16 +141,16 @@ struct ParserTests {
     @Test func parseExplicitTerminal() throws {
         let model = try parser.parse("cols:100 | names:nav=t:")
         let cells = try #require(model.cells)
-        #expect(cells[0] == CellSpec(name: "nav", type: .terminal))
+        #expect(cells[0] == CellSpec(name: "nav", type: .terminal(command: nil)))
     }
 
     @Test func parseMixedCellSpecs() throws {
         let model = try parser.parse("cols:33,34,33 | names:nav,docs=b:https://x.com,logs")
         let cells = try #require(model.cells)
         #expect(cells.count == 3)
-        #expect(cells[0] == CellSpec(name: "nav", type: .terminal))
+        #expect(cells[0] == CellSpec(name: "nav", type: .terminal(command: nil)))
         #expect(cells[1] == CellSpec(name: "docs", type: .browser(url: "https://x.com")))
-        #expect(cells[2] == CellSpec(name: "logs", type: .terminal))
+        #expect(cells[2] == CellSpec(name: "logs", type: .terminal(command: nil)))
     }
 
     @Test func parseCellCountValidationStillWorks() throws {
