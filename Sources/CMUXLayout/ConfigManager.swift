@@ -72,6 +72,52 @@ public struct ConfigManager: Sendable {
         }
     }
 
+    // MARK: - Template CRUD
+
+    public mutating func save(name: String, descriptor: String) throws {
+        _ = try Parser().parse(descriptor)
+
+        let tableName = "templates.\(name)"
+        if document.getString(table: tableName, key: "descriptor") != nil {
+            document.setString(table: tableName, key: "descriptor", value: descriptor)
+        } else {
+            let existing = document.tablesWithPrefix("templates.")
+            let insertAfter = existing.last ?? "templates"
+            document.insertTable(tableName, after: insertAfter)
+            document.setString(table: tableName, key: "descriptor", value: descriptor)
+        }
+        try persist()
+    }
+
+    public func load(name: String) throws -> String {
+        let tableName = "templates.\(name)"
+        guard let descriptor = document.getString(table: tableName, key: "descriptor") else {
+            throw ConfigError.templateNotFound(name)
+        }
+        return descriptor
+    }
+
+    public func list() throws -> [(name: String, descriptor: String)] {
+        document.tablesWithPrefix("templates.")
+            .compactMap { tableName in
+                let name = String(tableName.dropFirst("templates.".count))
+                guard let desc = document.getString(table: tableName, key: "descriptor") else {
+                    return nil
+                }
+                return (name: name, descriptor: desc)
+            }
+            .sorted { $0.name < $1.name }
+    }
+
+    public mutating func delete(name: String) throws {
+        let tableName = "templates.\(name)"
+        guard document.getString(table: tableName, key: "descriptor") != nil else {
+            throw ConfigError.templateNotFound(name)
+        }
+        document.removeTable(tableName)
+        try persist()
+    }
+
     // MARK: - Persistence
 
     private func persist() throws {
