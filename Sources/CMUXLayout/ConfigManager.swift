@@ -176,11 +176,12 @@ public struct ConfigManager: Sendable {
             let cellName = String(tableName.dropFirst(cellTablePrefix.count))
             let typeStr = document.getString(table: tableName, key: "type") ?? "terminal"
             let url = document.getString(table: tableName, key: "url")
+            let command = document.getString(table: tableName, key: "command")
             let surfaceType: SurfaceType
             if typeStr == "browser" {
                 surfaceType = .browser(url: url)
             } else {
-                surfaceType = .terminal(command: nil)
+                surfaceType = .terminal(command: command)
             }
             overrides[cellName] = CellSpec(name: cellName, type: surfaceType)
         }

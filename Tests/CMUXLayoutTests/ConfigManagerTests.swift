@@ -236,4 +236,58 @@ struct ConfigManagerTests {
         #expect(cells[0] == CellSpec(name: "nav", type: .terminal(command: nil)))
         #expect(cells[1] == CellSpec(name: "docs", type: .browser(url: nil)))
     }
+
+    // MARK: - Terminal commands from TOML
+
+    @Test func loadModelWithCommand() throws {
+        let dir = makeTempDir()
+        defer { cleanup(dir) }
+        let path = dir + "/config.toml"
+        var mgr = try ConfigManager(path: path)
+        try mgr.save(name: "dev", descriptor: "cols:50,50 | names:editor,logs")
+
+        let content = try String(contentsOfFile: path, encoding: .utf8)
+        let updated = content + "\n\n[templates.dev.cells.editor]\ntype = \"terminal\"\ncommand = \"nvim\""
+        try updated.write(toFile: path, atomically: true, encoding: .utf8)
+
+        let mgr2 = try ConfigManager(path: path)
+        let model = try mgr2.loadModel(name: "dev")
+        let cells = try #require(model.cells)
+        #expect(cells[0] == CellSpec(name: "editor", type: .terminal(command: "nvim")))
+        #expect(cells[1] == CellSpec(name: "logs", type: .terminal(command: nil)))
+    }
+
+    @Test func loadModelCommandOnBrowserIgnored() throws {
+        let dir = makeTempDir()
+        defer { cleanup(dir) }
+        let path = dir + "/config.toml"
+        var mgr = try ConfigManager(path: path)
+        try mgr.save(name: "dev", descriptor: "cols:100 | names:docs")
+
+        let content = try String(contentsOfFile: path, encoding: .utf8)
+        let updated = content + "\n\n[templates.dev.cells.docs]\ntype = \"browser\"\nurl = \"https://x.com\"\ncommand = \"ignored\""
+        try updated.write(toFile: path, atomically: true, encoding: .utf8)
+
+        let mgr2 = try ConfigManager(path: path)
+        let model = try mgr2.loadModel(name: "dev")
+        let cells = try #require(model.cells)
+        #expect(cells[0] == CellSpec(name: "docs", type: .browser(url: "https://x.com")))
+    }
+
+    @Test func loadModelTerminalWithoutCommand() throws {
+        let dir = makeTempDir()
+        defer { cleanup(dir) }
+        let path = dir + "/config.toml"
+        var mgr = try ConfigManager(path: path)
+        try mgr.save(name: "dev", descriptor: "cols:100 | names:shell")
+
+        let content = try String(contentsOfFile: path, encoding: .utf8)
+        let updated = content + "\n\n[templates.dev.cells.shell]\ntype = \"terminal\""
+        try updated.write(toFile: path, atomically: true, encoding: .utf8)
+
+        let mgr2 = try ConfigManager(path: path)
+        let model = try mgr2.loadModel(name: "dev")
+        let cells = try #require(model.cells)
+        #expect(cells[0] == CellSpec(name: "shell", type: .terminal(command: nil)))
+    }
 }
