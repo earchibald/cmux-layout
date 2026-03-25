@@ -1,10 +1,11 @@
 import Foundation
 
 /// Closure type for sending commands to terminal surfaces.
+/// Parameters: surfaceRef, workspaceId, command (already interpolated)
 public typealias CommandSender = (String, String, String) -> Void
 
 /// Default command sender that shells out to cmux send CLI.
-public func defaultCommandSender(surfaceRef: String, workspaceId: String, command: String) {
+private func defaultCommandSender(surfaceRef: String, workspaceId: String, command: String) {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
     process.arguments = ["cmux", "send", "--workspace", workspaceId, "--surface", surfaceRef, command + "\n"]
@@ -28,7 +29,7 @@ public struct LayoutResult {
 }
 
 public struct CellInfo {
-    public let surfaceRef: String
+    public var surfaceRef: String
     public let paneRef: String
     public let paneId: String
     public let name: String?
@@ -286,15 +287,7 @@ public struct Executor {
                 "surface_id": cells[i].surfaceRef,
             ])
 
-            cells[i] = CellInfo(
-                surfaceRef: newSurfRef,
-                paneRef: cells[i].paneRef,
-                paneId: cells[i].paneId,
-                name: cells[i].name,
-                type: cells[i].type,
-                column: cells[i].column,
-                row: cells[i].row
-            )
+            cells[i].surfaceRef = newSurfRef
         }
     }
 

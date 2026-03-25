@@ -225,18 +225,18 @@ enum CLI {
             let config = try ConfigManager()
             print(config.configPath)
         case "show":
-            let config = try ConfigManager()
-            let content = try String(contentsOfFile: config.configPath, encoding: .utf8)
+            let path = ConfigManager.defaultPath
+            let content = try String(contentsOfFile: path, encoding: .utf8)
             print(content)
         case "init":
             let force = args.contains("--force")
             let path = ConfigManager.defaultPath
-            if FileManager.default.fileExists(atPath: path) && !force {
-                fputs("Config file already exists at \(path). Use --force to overwrite.\n", stderr)
-                exit(1)
-            }
-            if force {
-                try? FileManager.default.removeItem(atPath: path)
+            if FileManager.default.fileExists(atPath: path) {
+                guard force else {
+                    fputs("Config file already exists at \(path). Use --force to overwrite.\n", stderr)
+                    exit(1)
+                }
+                try FileManager.default.removeItem(atPath: path)
             }
             let _ = try ConfigManager()
             print("Initialized config at \(path)")

@@ -4,35 +4,29 @@ public struct Serializer: Sendable {
     public init() {}
 
     public func serialize(_ model: LayoutModel) -> String {
-        if let gridStr = tryGridShorthand(model) {
-            var parts: [String] = []
-            if let name = model.workspaceName {
-                parts.append("workspace:\(name)")
-            }
-            parts.append(gridStr)
-            if let cells = model.cells {
-                parts.append("names:\(cells.map { serializeCellSpec($0) }.joined(separator: ","))")
-            }
-            return parts.joined(separator: " | ")
-        }
-
         var parts: [String] = []
+
         if let name = model.workspaceName {
             parts.append("workspace:\(name)")
         }
-        parts.append("cols:\(formatPercentages(model.columns))")
 
-        let rowConfigs = model.rows
-        if !rowConfigs.isEmpty {
-            let values = Array(rowConfigs.values)
-            let allSame = values.dropFirst().allSatisfy { $0 == values[0] }
-            let coversAll = rowConfigs.count == model.columns.count
+        if let gridStr = tryGridShorthand(model) {
+            parts.append(gridStr)
+        } else {
+            parts.append("cols:\(formatPercentages(model.columns))")
 
-            if allSame && coversAll {
-                parts.append("rows:\(formatPercentages(values[0]))")
-            } else {
-                for index in rowConfigs.keys.sorted() {
-                    parts.append("rows[\(index)]:\(formatPercentages(rowConfigs[index]!))")
+            let rowConfigs = model.rows
+            if !rowConfigs.isEmpty {
+                let values = Array(rowConfigs.values)
+                let allSame = values.dropFirst().allSatisfy { $0 == values[0] }
+                let coversAll = rowConfigs.count == model.columns.count
+
+                if allSame && coversAll {
+                    parts.append("rows:\(formatPercentages(values[0]))")
+                } else {
+                    for index in rowConfigs.keys.sorted() {
+                        parts.append("rows[\(index)]:\(formatPercentages(rowConfigs[index]!))")
+                    }
                 }
             }
         }

@@ -34,8 +34,7 @@ public struct ConfigManager: Sendable {
             atPath: dir, withIntermediateDirectories: true
         )
 
-        if FileManager.default.fileExists(atPath: self.path) {
-            let content = try String(contentsOfFile: self.path, encoding: .utf8)
+        if let content = try? String(contentsOfFile: self.path, encoding: .utf8) {
             self.document = try TOMLParser.parse(content)
             try checkVersion()
         } else {
