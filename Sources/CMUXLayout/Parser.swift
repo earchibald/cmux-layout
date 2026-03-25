@@ -104,15 +104,15 @@ public struct Parser: Sendable {
                 let urlStr = String(remainder.dropFirst(2))
                 return CellSpec(name: name, type: .browser(url: urlStr.isEmpty ? nil : urlStr))
             } else if remainder.hasPrefix("t:") {
-                return CellSpec(name: name, type: .terminal)
+                return CellSpec(name: name, type: .terminal(command: nil))
             }
-            return CellSpec(name: token, type: .terminal)
+            return CellSpec(name: token, type: .terminal(command: nil))
         }
         if token.hasPrefix("b:") {
             let urlStr = String(token.dropFirst(2))
             return CellSpec(name: nil, type: .browser(url: urlStr.isEmpty ? nil : urlStr))
         }
-        return CellSpec(name: token, type: .terminal)
+        return CellSpec(name: token, type: .terminal(command: nil))
     }
 
     private func parsePercentages(_ str: String) throws -> [Double] {

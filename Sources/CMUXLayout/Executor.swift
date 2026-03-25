@@ -218,7 +218,7 @@ public struct Executor {
                     paneRef: paneRef,
                     paneId: paneId,
                     name: cellSpec?.name,
-                    type: cellSpec?.type ?? .terminal,
+                    type: cellSpec?.type ?? .terminal(command: nil),
                     column: col,
                     row: row
                 ))

@@ -198,7 +198,7 @@ struct ConfigManagerTests {
         let mgr2 = try ConfigManager(path: path)
         let model = try mgr2.loadModel(name: "dev")
         let cells = try #require(model.cells)
-        #expect(cells[0] == CellSpec(name: "nav", type: .terminal))
+        #expect(cells[0] == CellSpec(name: "nav", type: .terminal(command: nil)))
         #expect(cells[1] == CellSpec(name: "docs", type: .browser(url: "https://docs.example.com")))
     }
 
@@ -233,7 +233,7 @@ struct ConfigManagerTests {
         let mgr2 = try ConfigManager(path: path)
         let model = try mgr2.loadModel(name: "dev")
         let cells = try #require(model.cells)
-        #expect(cells[0] == CellSpec(name: "nav", type: .terminal))
+        #expect(cells[0] == CellSpec(name: "nav", type: .terminal(command: nil)))
         #expect(cells[1] == CellSpec(name: "docs", type: .browser(url: nil)))
     }
 }

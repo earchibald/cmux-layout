@@ -180,7 +180,7 @@ public struct ConfigManager: Sendable {
             if typeStr == "browser" {
                 surfaceType = .browser(url: url)
             } else {
-                surfaceType = .terminal
+                surfaceType = .terminal(command: nil)
             }
             overrides[cellName] = CellSpec(name: cellName, type: surfaceType)
         }
