@@ -201,4 +201,42 @@ struct TOMLParserTests {
         let names = doc.tablesWithPrefix("templates.")
         #expect(names == ["templates.dev", "templates.ops"])
     }
+
+    // MARK: - Unsupported features
+
+    @Test func rejectArraysOfTables() {
+        #expect(throws: TOMLError.self) {
+            try TOMLParser.parse("[[items]]")
+        }
+    }
+
+    @Test func rejectBooleanValue() {
+        #expect(throws: TOMLError.self) {
+            try TOMLParser.parse(#"enabled = true"#)
+        }
+    }
+
+    @Test func rejectNumericValue() {
+        #expect(throws: TOMLError.self) {
+            try TOMLParser.parse("port = 8080")
+        }
+    }
+
+    @Test func rejectArrayValue() {
+        #expect(throws: TOMLError.self) {
+            try TOMLParser.parse(#"items = ["a", "b"]"#)
+        }
+    }
+
+    @Test func rejectInlineTableValue() {
+        #expect(throws: TOMLError.self) {
+            try TOMLParser.parse(#"point = { x = 1, y = 2 }"#)
+        }
+    }
+
+    @Test func rejectUnterminatedString() {
+        #expect(throws: TOMLError.self) {
+            try TOMLParser.parse(#"key = "unclosed"#)
+        }
+    }
 }
