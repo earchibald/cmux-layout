@@ -29,6 +29,8 @@ enum CLI {
                 try handleList()
             case "config":
                 try handleConfig(Array(args.dropFirst()))
+            case "describe":
+                try handleDescribe(Array(args.dropFirst()))
             case "--help", "-h":
                 printUsage()
             default:
@@ -48,6 +50,9 @@ enum CLI {
         } catch let error as ConfigError {
             fputs("Config error: \(error)\n", stderr)
             exit(1)
+        } catch let error as DescriberError {
+            fputs("Describe error: \(error)\n", stderr)
+            exit(3)
         } catch {
             fputs("Error: \(error)\n", stderr)
             exit(1)
@@ -247,6 +252,81 @@ enum CLI {
         }
     }
 
+    static func handleDescribe(_ args: [String]) throws {
+        var workspace: String?
+        var includeName = false
+        var jsonOutput = false
+
+        var i = 0
+        while i < args.count {
+            switch args[i] {
+            case "--workspace":
+                i += 1
+                guard i < args.count else {
+                    fputs("--workspace requires a value\n", stderr)
+                    exit(1)
+                }
+                workspace = args[i]
+            case "--include-name":
+                includeName = true
+            case "--json":
+                jsonOutput = true
+            default:
+                fputs("Unknown option: \(args[i])\n", stderr)
+                exit(1)
+            }
+            i += 1
+        }
+
+        guard let ws = workspace else {
+            fputs("Usage: cmux-layout describe --workspace WS [--include-name] [--json]\n", stderr)
+            exit(1)
+        }
+
+        let client = LiveSocketClient()
+        let describer = Describer(client: client)
+        let model = try describer.describe(workspace: ws, includeWorkspaceName: includeName)
+        let descriptor = Serializer().serialize(model)
+
+        if jsonOutput {
+            var output: [String: Any] = [
+                "descriptor": descriptor,
+                "workspace": ws,
+            ]
+            if let name = model.workspaceName {
+                output["workspace_name"] = name
+            }
+            if let cells = model.cells {
+                var cellPositions: [(column: Int, row: Int)] = []
+                for col in 0..<model.columns.count {
+                    let rowCount = model.rows[col]?.count ?? 1
+                    for row in 0..<rowCount {
+                        cellPositions.append((column: col, row: row))
+                    }
+                }
+                output["cells"] = cells.enumerated().map { (idx, cell) -> [String: Any] in
+                    let pos = idx < cellPositions.count ? cellPositions[idx] : (column: idx, row: 0)
+                    var dict: [String: Any] = [
+                        "column": pos.column,
+                        "row": pos.row,
+                    ]
+                    if let name = cell.name { dict["name"] = name }
+                    switch cell.type {
+                    case .terminal: dict["type"] = "terminal"
+                    case .browser(let url):
+                        dict["type"] = "browser"
+                        if let url = url { dict["url"] = url }
+                    }
+                    return dict
+                }
+            }
+            let data = try JSONSerialization.data(withJSONObject: output, options: [.prettyPrinted, .sortedKeys])
+            print(String(data: data, encoding: .utf8)!)
+        } else {
+            print(descriptor)
+        }
+    }
+
     static func printUsage() {
         print("""
         cmux-layout — Declarative cmux layout tool
@@ -256,6 +336,7 @@ enum CLI {
           cmux-layout validate <descriptor>
           cmux-layout plan <descriptor>
           cmux-layout verify --workspace WS <descriptor>
+          cmux-layout describe --workspace WS [--include-name] [--json]
           cmux-layout save <name> <descriptor>
           cmux-layout load [--workspace WS] <name>
           cmux-layout list
